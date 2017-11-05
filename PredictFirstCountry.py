@@ -31,17 +31,9 @@ def weightedRandomImputation(df):
                 ratio_list.append(float(df_counts[i])*100/float(Total_minus_unknown))
             min_ratio = min(ratio_list)
             ratio_list = [int(x/min_ratio) for x in ratio_list]
-
-            print(ratio_list[0])
-            print(ratio_list[1])
-            print(ratio_list[2])
             counts_list=df_counts.index.tolist()
             pairs = list(zip(ratio_list,counts_list))
             df[col]=df[col].apply(lambda x: weightedRandomHelper(pairs) if(pd.isnull(x)) else x)
-            nan_count=df[col].isnull().sum()
-            print("after ",nan_count)
-                
-                
     return df
     
 
@@ -54,7 +46,3 @@ dfs=np.split(df,[int(shape[0]*0.7)])
 df=dfs[0]   #Training data
 df_test=dfs[1]  #Testing data
 df=weightedRandomImputation(df)
-
-for col in df:
-        nan_count=df[col].isnull().sum()
-        print("col ",nan_count)
