@@ -55,29 +55,6 @@ df=dfs[0]   #Training data
 df_test=dfs[1]  #Testing data
 df=weightedRandomImputation(df)
 
-
-####delete below
-##nan_count=df['gender'].isnull().sum()
-##female=df['gender'].value_counts()['FEMALE']
-##male=df['gender'].value_counts()['MALE']
-##other=df['gender'].value_counts()['OTHER']
-##
-##
-##
-##print("other : ", other, " MALE : ", male, " FEMALE : ", female, " Unknown : ",nan_count)
-##print("TOTAL : ",other+male+female+nan_count)
-##
-##Total = other+male+female+nan_count
-##Total_minus_unknown = other+male+female
-##
-##male_ratio = float(male)*100/float(Total_minus_unknown)
-##female_ratio = float(female)*100/float(Total_minus_unknown)
-##other_ratio = float(other)*100/float(Total_minus_unknown)
-##kfactor = min(other_ratio,male_ratio,female_ratio)
-##print("Other Ratio : ", other_ratio/kfactor, " MALE Ratio : ", male_ratio/kfactor, " FEMALE : ", female_ratio/kfactor)
-##
-##    ###delete above
-
 for col in df:
         nan_count=df[col].isnull().sum()
         print("col ",nan_count)
