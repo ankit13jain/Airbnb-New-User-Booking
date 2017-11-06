@@ -42,11 +42,13 @@ def weightedRandomHelper(pairs):
 def weightedRandomImputation(df):
     for col in df:
         nan_count=df[col].isnull().sum()
+	
         #print("col before ",col,nan_count)
         #print("df col size",len(df[col]))
         if col=='age':
             df=handle_outlier_age(df)
         if nan_count>0 and col!='age':
+	    #print col
             df_counts=df[col].value_counts()
             Total_minus_unknown = 0
             Total_minus_unknown = len(df[col]) - len(df_counts)
@@ -60,7 +62,14 @@ def weightedRandomImputation(df):
             pairs = list(zip(ratio_list,counts_list))
             df[col]=df[col].apply(lambda x: weightedRandomHelper(pairs) if(pd.isnull(x)) else x)
             nan_count=df[col].isnull().sum()
-            #print("col after ",col,nan_count)
+            #print("col after ",col,nan_count)	    	
+	    
+	if col=='signup_flow':
+
+	    bins = [-1,5,10,15,20,28]
+	    group_names = [0,1,2,3,4]
+	    df['signup_flow_bins'] = pd.cut(df['signup_flow'], bins, labels=group_names)
+
     return df
 
 
@@ -89,9 +98,11 @@ def randomForestDecisionClassifier(df,df_test):
     #dropping below columns as they do not improve the accuracy based on clf.feature_importances_
     X_train = X_train.drop('language', 1)
     X_train = X_train.drop('signup_app', 1)
+    X_train = X_train.drop('signup_flow', 1)
     #X_train = X_train.drop('timestamp_first_active', 1)
     X_test = X_test.drop('language', 1)
     X_test = X_test.drop('signup_app', 1)
+    X_test = X_test.drop('signup_flow', 1)
     #X_test = X_test.drop('timestamp_first_active', 1)
 
     clf = RandomForestClassifier(max_features= 'auto', max_depth = 20, random_state=10, min_samples_split = 4, verbose =1, class_weight = 'balanced', oob_score =False, n_estimators = 100)
@@ -99,9 +110,12 @@ def randomForestDecisionClassifier(df,df_test):
     clf.fit(X_train, Y_train)
     print("Importance of the features : ",clf.feature_importances_)
     
-##    fig, ax = plt.subplots()
-##    ax.plot(list(X_train),clf.feature_importances_)
-##    plt.show()
+    x = [i for i in range(0,len(clf.feature_importances_))]
+    plt.xticks(x, list(X_train))
+    plt.plot(x, clf.feature_importances_,"ro")
+    plt.plot(x, clf.feature_importances_)
+    plt.show()
+
     Y_predict = clf.predict(X_test)
     accuracy = clf.score(X_test, Y_test, sample_weight=None)
     print ("Accuracy using Random Forest Classifier is : %.2f%%" % (accuracy * 100.0))
