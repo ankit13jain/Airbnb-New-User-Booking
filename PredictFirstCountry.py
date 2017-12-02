@@ -11,7 +11,6 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import cross_val_score
 from sklearn.naive_bayes import GaussianNB
-from sklearn.svm import SVC
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import classification_report
@@ -221,50 +220,8 @@ def xgboostClassifier(df,df_test):
     print("Accuracy with XGBoost is : %.2f%%" % (accuracy * 100.0))
     print("The confusion matrix is : \n",confusion_matrix(Y_test, Y_pred ))
     print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
-    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
-    
+    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))    
 
-def SVC_classifier(df,df_test):
-    print("\nLearning the SVM Classifier Model...")
-    Y_train = df.country_destination
-    X_train = df.drop('country_destination', 1)
-    X_train = X_train.drop('id', 1)
-
-    #preprocess of test
-    Y_test = df_test.country_destination
-    X_test = df_test.drop('country_destination', 1)
-    X_test = X_test.drop('id', 1)
-
-    # encode Y train
-    le = LabelEncoder()
-    Y_train = le.fit_transform(Y_train)
-
-    X_train = X_train.apply(LabelEncoder().fit_transform)
-    X_test= X_test.apply(LabelEncoder().fit_transform)
-
-    # Encode Y Test 
-    le_t = LabelEncoder()
-    Y_test = le_t.fit_transform(Y_test)
-
-    #dropping columns as they dont improve accuracy
-    X_train = X_train.drop('timestamp_first_active', 1)
-    X_train = X_train.drop('language', 1)
-    X_train = X_train.drop('signup_app', 1)
-    X_test = X_test.drop('timestamp_first_active', 1)
-    X_test = X_test.drop('language', 1)
-    X_test = X_test.drop('signup_app', 1)
-
-
-    svc = SVC()
-    svc.fit(X_train, Y_train)
-    y_pred = svc.predict(X_test)
-    predictions = [round(value) for value in y_pred]
-    accuracy = accuracy_score(Y_test, predictions)
-    print("Accuracy with SVC linear is : %.2f%%" % (accuracy * 100.0))
-    print(confusion_matrix(Y_test,y_pred ))
-    print(mean_absolute_error(Y_test,y_pred ))
-    print(classification_report(Y_test,y_pred ))
-    
 def KNNClassifier(df,df_test):
     print("\nLearning the KNN Classifier Model...")
     Y_train = df.country_destination
@@ -423,6 +380,5 @@ df_test = weightedRandomImputation(df_test)
 randomForestDecisionClassifier(df,df_test)
 xgboostClassifier(df,df_test)
 KNNClassifier(df,df_test)
-SVC_classifier(df,df_test)
 Naivebayes(df,df_test)
 ann(df,df_test)
