@@ -1,6 +1,3 @@
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-
 import pandas as pd
 import numpy as np
 from random import randint
@@ -22,9 +19,11 @@ import os
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import time
-
-#from sklearn.metrics import precision_recall_fscore_support
-#import matplotlib.pyplot as plt
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasClassifier
+from keras.utils import np_utils
+from sklearn.model_selection import KFold
 
 def findNA(df):
     df = df.replace(r'\s+', np.nan, regex=True)
@@ -43,9 +42,9 @@ def handle_outlier_age(df):
     
     #Valid age range between 14 to 90 as per data, otherwise check if its outlier or not
     df['age']=df['age'].apply(lambda x: x if 14<=x<=90 else np.nan)     
-    mode = df['age'].mean()
-    mode = int(mode)
-    df['age']=df['age'].apply(lambda x: mode if np.isnan(x) else x) 
+    mean = df['age'].mean()
+    mean = int(mean)
+    df['age']=df['age'].apply(lambda x: mean if np.isnan(x) else x) 
     return df
 
 #This functions generates random value keeping the proportion of possible values in consideration
@@ -59,12 +58,10 @@ def weightedRandomHelper(pairs):
 def weightedRandomImputation(df):
     for col in df:
         nan_count=df[col].isnull().sum()
-        #print("col before ",col,nan_count)
-        #print("df col size",len(df[col]))
         if col=='age':
             df=handle_outlier_age(df)
             
-        # For parameters other then age, impute their missing value using stratified methodolofy of missing value imputation    
+        # For parameters other then age, impute their missing value using stratified methodology of missing value imputation    
         if nan_count>0 and col!='age': 
             df_counts=df[col].value_counts()
             Total_minus_unknown = 0
@@ -86,7 +83,6 @@ def weightedRandomImputation(df):
             df['signup_flow_bins'] = pd.cut(df['signup_flow'], bins, labels=group_names)
 
     return df
-
 
 def randomForestDecisionClassifier(df,df_test):
     print("\nLearning the Random Forest Classifier Model...")
@@ -114,11 +110,11 @@ def randomForestDecisionClassifier(df,df_test):
     X_train = X_train.drop('language', 1)
     X_train = X_train.drop('signup_app', 1)
     X_train = X_train.drop('signup_flow', 1)
-    #X_train = X_train.drop('timestamp_first_active', 1)
+    X_train = X_train.drop('timestamp_first_active', 1)
     X_test = X_test.drop('language', 1)
     X_test = X_test.drop('signup_app', 1)
     X_test = X_test.drop('signup_flow', 1)
-    #X_test = X_test.drop('timestamp_first_active', 1)
+    X_test = X_test.drop('timestamp_first_active', 1)
 
     clf = RandomForestClassifier(max_features= 'auto', max_depth = 20, random_state=10, min_samples_split = 4, verbose =1, class_weight = 'balanced', oob_score =False, n_estimators = 100)
 
@@ -129,15 +125,18 @@ def randomForestDecisionClassifier(df,df_test):
     plt.xticks(x, list(X_train))
     plt.plot(x, clf.feature_importances_,"ro")
     plt.plot(x, clf.feature_importances_)
+    plt.xlabel("Features")
+    plt.ylabel("Relevance Factor")
+    plt.title("Relevance of the Features as per Random Forest Classifier Model")
     plt.xticks(rotation='vertical')
     plt.show()
     
-    Y_predict = clf.predict(X_test)
+    Y_pred = clf.predict(X_test)
     accuracy = clf.score(X_test, Y_test, sample_weight=None)
     print ("Accuracy using Random Forest Classifier is : %.2f%%" % (accuracy * 100.0))
-    print(confusion_matrix(Y_test, Y_predict))
-    print(mean_absolute_error(Y_test, Y_predict))
-    print(classification_report(Y_test, Y_predict))
+    print("The confusion matrix is : \n",confusion_matrix(Y_test, Y_pred ))
+    print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
+    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
 
 def Naivebayes(df,df_test):
     print("\nLearning the Naivebayes Classifier Model...")
@@ -171,12 +170,15 @@ def Naivebayes(df,df_test):
 
     gnb = GaussianNB() 
     gnb.fit(X_train, Y_train)
-    y_pred = gnb.predict(X_test)
+    Y_pred = gnb.predict(X_test)
 
-    predictions = [round(value) for value in y_pred]
+    predictions = [round(value) for value in Y_pred]
 
     accuracy = accuracy_score(Y_test, predictions)
     print("Accuracy with NB is : %.2f%%" % (accuracy * 100.0))
+    print("The confusion matrix is : \n",confusion_matrix(Y_test, Y_pred ))
+    print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
+    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
 
 def xgboostClassifier(df,df_test):
     print("\nLearning the XGBoost Classifier Model...")
@@ -211,15 +213,15 @@ def xgboostClassifier(df,df_test):
 
     model = XGBClassifier()
     model.fit(X_train, Y_train)
-    y_pred = model.predict(X_test)
+    Y_pred = model.predict(X_test)
 
-    predictions = [round(value) for value in y_pred]
+    predictions = [round(value) for value in Y_pred]
 
     accuracy = accuracy_score(Y_test, predictions)
     print("Accuracy with XGBoost is : %.2f%%" % (accuracy * 100.0))
-    print(confusion_matrix(Y_test,y_pred ))
-    print(mean_absolute_error(Y_test,y_pred ))
-    print(classification_report(Y_test,y_pred ))
+    print("The confusion matrix is : \n",confusion_matrix(Y_test, Y_pred ))
+    print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
+    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
     
 
 def SVC_classifier(df,df_test):
@@ -263,17 +265,6 @@ def SVC_classifier(df,df_test):
     print(mean_absolute_error(Y_test,y_pred ))
     print(classification_report(Y_test,y_pred ))
     
-#    svc2 = SVC(kernel='rbf')()
-#    svc2.fit(X_train, Y_train)
-#    y_pred = svc2.predict(X_test)
-#    predictions = [round(value) for value in y_pred]
-#    accuracy = accuracy_score(Y_test, predictions)
-#    print("Accuracy with SVC rbf is : %.2f%%" % (accuracy * 100.0))
-#    print(confusion_matrix(Y_test,y_pred ))
-#    print(mean_absolute_error(Y_test,y_pred ))
-#    print(classification_report(Y_test,y_pred ))
-    
-    
 def KNNClassifier(df,df_test):
     print("\nLearning the KNN Classifier Model...")
     Y_train = df.country_destination
@@ -305,10 +296,8 @@ def KNNClassifier(df,df_test):
     X_test = X_test.drop('signup_app', 1)
 
     n_neighbors = 300
-    #for weights in ['uniform', 'distance']:
     for weights in ['distance']:
     # we create an instance of Neighbours Classifier and fit the data.
-        #clf = KNeighborsClassifier(n_neighbors, weights=weights)
         clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights,algorithm='ball_tree')
         clf.fit(X_train, Y_train)
 
@@ -319,40 +308,100 @@ def KNNClassifier(df,df_test):
         accuracy = accuracy_score(Y_test, prediction_knn)
         print("Accuracy with KNN is : %.2f%%" % (accuracy * 100.0))
         
-    print(confusion_matrix(Y_test, Y_pred ))
-    print(mean_absolute_error(Y_test, Y_pred ))
-    print(classification_report(Y_test, Y_pred ))
+    print("The confusion matrix is : \n",confusion_matrix(Y_test, Y_pred ))
+    print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
+    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
 
+def ann(df,df_test):
 
-def randomForestDecisionClassifier_CV(df):
-    print("\nLearning the Random Forest Classifier Model with Cross Validation...")
+    print("\nLearning the Artificial Neural Network...")
     Y_train = df.country_destination
     X_train = df.drop('country_destination', 1)
     X_train = X_train.drop('id', 1)
 
+    #preprocess of test
+    Y_test = df_test.country_destination
+    X_test = df_test.drop('country_destination', 1)
+    X_test = X_test.drop('id', 1)
+
     # encode Y train
     le = LabelEncoder()
     Y_train = le.fit_transform(Y_train)
-    X_train = X_train.apply(LabelEncoder().fit_transform)
 
-    
-    #dropping below columns as they do not improve the accuracy based on clf.feature_importances_
+    # Encode Y Test 
+    le_t = LabelEncoder()
+    Y_test = le_t.fit_transform(Y_test)
+
+    #dropping columns as they dont improve accuracy
+    X_train = X_train.drop('timestamp_first_active', 1)
     X_train = X_train.drop('language', 1)
     X_train = X_train.drop('signup_app', 1)
-    X_train = X_train.drop('signup_flow', 1)
-    #X_train = X_train.drop('timestamp_first_active', 1)
+    X_test = X_test.drop('timestamp_first_active', 1)
+    X_test = X_test.drop('language', 1)
+    X_test = X_test.drop('signup_app', 1)
+    
+    # encode class values as integers
+    encoder = LabelEncoder()
+    encoder.fit(Y_train)
+    encoded_Y = encoder.transform(Y_train)
+    print(encoded_Y)
+    # convert integers to dummy variables (i.e. one hot encoded)
+    Y_train = pd.DataFrame(np_utils.to_categorical(encoded_Y))
 
+    encoder = LabelEncoder()
+    encoder.fit(Y_test)
+    encoded_Y = encoder.transform(Y_test)
+    print(encoded_Y)
+    # convert integers to dummy variables (i.e. one hot encoded)
+    Y_test = pd.DataFrame(np_utils.to_categorical(encoded_Y))
 
-    clf = RandomForestClassifier(max_features= 'auto', max_depth = 20, random_state=10, min_samples_split = 4, verbose =1, class_weight = 'balanced', oob_score =False, n_estimators = 100)
+    df_encoded = pd.DataFrame(index=range(1,len(X_train)))
+    
+    for col in X_train:
+        if col=='age': 
+            bins = [13,20,30,40,50,60,70,80,91]
+            group_names = [0,1,2,3,4,5,6,7]
+            X_train['age_bins'] = pd.cut(X_train['age'], bins, labels=group_names)
+            X_train=X_train.drop('age',1)
+            col = 'age_bins'
+        encoder = LabelEncoder()
+        encoder.fit(X_train[col])
+        encoded_Col = encoder.transform(X_train[col])
+        df_encoded = pd.concat([df_encoded,pd.DataFrame(np_utils.to_categorical(encoded_Col))],axis=1)
+    df_encoded_test = pd.DataFrame(index=range(1,len(X_test)))
+    for col in X_test:
+        if col=='age': 
+            bins = [13,20,30,40,50,60,70,80,91]
+            group_names = [0,1,2,3,4,5,6,7]
+            X_test['age_bins'] = pd.cut(X_test['age'], bins, labels=group_names)
+            X_test=X_test.drop('age',1)
+            col = 'age_bins'
+        encoder = LabelEncoder()
+        encoder.fit(X_test[col])
+        encoded_Col = encoder.transform(X_test[col])
+        df_encoded_test = pd.concat([df_encoded_test,pd.DataFrame(np_utils.to_categorical(encoded_Col))],axis=1)
+    for col in df_encoded_test:
+        print (col)
+    # create model
+    model = Sequential()
+    model.add(Dense(100, input_dim=len(df_encoded.columns), activation='relu'))
+    model.add(Dense(12, activation='softmax'))
+    # Compile model
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    
+    print("encode shape",df_encoded.shape)
+    print("test shape",df_encoded_test.shape)
+    print(Y_train.shape)
+    model.fit(df_encoded.values, Y_train.values, epochs=40, batch_size=1000)
+    scores = model.evaluate(df_encoded.values, Y_train.values)
+    print("\nTraining Score: %.2f" % (scores[1]*100))
+    scores = model.evaluate(df_encoded_test.values, Y_test.values)
+    print("\nTesting Score: %.2f" % (scores[1]*100))
 
-    scores = cross_val_score(clf,X_train, Y_train, cv=5)
-    print("Accuracy: %0.2f (+/- %0.2f)" % (scores.mean()*100.0, (scores.std() * 2)*100.0))
-
-
+    
 ###########_____Driver Code______##############
 
 df = pd.read_csv('train_users_2.csv')   #load data
-
 
 print("Doing Preprocessing")
 print("Handling Missing Values")
@@ -371,9 +420,9 @@ df=weightedRandomImputation(df) # Missing Value Imputation
 df_test = encodeDate(df_test)
 df_test = weightedRandomImputation(df_test)
 
-##randomForestDecisionClassifier(df,df_test)
-##xgboostClassifier(df,df_test)
-##KNNClassifier(df,df_test)
-###SVC_classifier(df,df_test)
-##Naivebayes(df,df_test)
-randomForestDecisionClassifier_CV(original_data)
+randomForestDecisionClassifier(df,df_test)
+xgboostClassifier(df,df_test)
+KNNClassifier(df,df_test)
+SVC_classifier(df,df_test)
+Naivebayes(df,df_test)
+ann(df,df_test)
