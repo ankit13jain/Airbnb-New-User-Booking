@@ -66,7 +66,6 @@ def weightedRandomImputation(df):
             Total_minus_unknown = 0
             Total_minus_unknown = len(df[col]) - len(df_counts)
             ratio_list=[]
-            #print(df_counts[0])
             for i in range(len(df_counts)):
                 ratio_list.append(float(df_counts[i])*100/float(Total_minus_unknown))
             min_ratio = min(ratio_list)
@@ -220,8 +219,8 @@ def xgboostClassifier(df,df_test):
     print("Accuracy with XGBoost is : %.2f%%" % (accuracy * 100.0))
     print("The confusion matrix is : \n",confusion_matrix(Y_test, Y_pred ))
     print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
-    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))    
-
+    print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
+    
 def KNNClassifier(df,df_test):
     print("\nLearning the KNN Classifier Model...")
     Y_train = df.country_destination
@@ -253,8 +252,10 @@ def KNNClassifier(df,df_test):
     X_test = X_test.drop('signup_app', 1)
 
     n_neighbors = 300
+    #for weights in ['uniform', 'distance']:
     for weights in ['distance']:
     # we create an instance of Neighbours Classifier and fit the data.
+        #clf = KNeighborsClassifier(n_neighbors, weights=weights)
         clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights,algorithm='ball_tree')
         clf.fit(X_train, Y_train)
 
@@ -269,9 +270,10 @@ def KNNClassifier(df,df_test):
     print("Mean Absolute error is :",mean_absolute_error(Y_test, Y_pred ))
     print("Evaluation Metrics :\n",classification_report(Y_test, Y_pred ))
 
+
 def ann(df,df_test):
 
-    print("\nLearning the Artificial Neural Network...")
+    print("\nLearning the Artificial Neural Network Classifier Model...")
     Y_train = df.country_destination
     X_train = df.drop('country_destination', 1)
     X_train = X_train.drop('id', 1)
@@ -296,7 +298,7 @@ def ann(df,df_test):
     X_test = X_test.drop('timestamp_first_active', 1)
     X_test = X_test.drop('language', 1)
     X_test = X_test.drop('signup_app', 1)
-    
+
     # encode class values as integers
     encoder = LabelEncoder()
     encoder.fit(Y_train)
@@ -311,49 +313,38 @@ def ann(df,df_test):
     print(encoded_Y)
     # convert integers to dummy variables (i.e. one hot encoded)
     Y_test = pd.DataFrame(np_utils.to_categorical(encoded_Y))
-
-    df_encoded = pd.DataFrame(index=range(1,len(X_train)))
     
-    for col in X_train:
+    df_encoded = pd.DataFrame(index=range(1,len(X_train)))    
+    train = pd.concat([X_train, X_test])
+
+    for col in train:
         if col=='age': 
             bins = [13,20,30,40,50,60,70,80,91]
             group_names = [0,1,2,3,4,5,6,7]
-            X_train['age_bins'] = pd.cut(X_train['age'], bins, labels=group_names)
-            X_train=X_train.drop('age',1)
+            train['age_bins'] = pd.cut(train['age'], bins, labels=group_names)
+            train=train.drop('age',1)
             col = 'age_bins'
         encoder = LabelEncoder()
-        encoder.fit(X_train[col])
-        encoded_Col = encoder.transform(X_train[col])
+        encoder.fit(train[col])
+        encoded_Col = encoder.transform(train[col])
         df_encoded = pd.concat([df_encoded,pd.DataFrame(np_utils.to_categorical(encoded_Col))],axis=1)
-    df_encoded_test = pd.DataFrame(index=range(1,len(X_test)))
-    for col in X_test:
-        if col=='age': 
-            bins = [13,20,30,40,50,60,70,80,91]
-            group_names = [0,1,2,3,4,5,6,7]
-            X_test['age_bins'] = pd.cut(X_test['age'], bins, labels=group_names)
-            X_test=X_test.drop('age',1)
-            col = 'age_bins'
-        encoder = LabelEncoder()
-        encoder.fit(X_test[col])
-        encoded_Col = encoder.transform(X_test[col])
-        df_encoded_test = pd.concat([df_encoded_test,pd.DataFrame(np_utils.to_categorical(encoded_Col))],axis=1)
-    for col in df_encoded_test:
-        print (col)
     # create model
     model = Sequential()
     model.add(Dense(100, input_dim=len(df_encoded.columns), activation='relu'))
+    #model.add(Dense(50, activation='relu'))
     model.add(Dense(12, activation='softmax'))
     # Compile model
     model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-    
-    print("encode shape",df_encoded.shape)
-    print("test shape",df_encoded_test.shape)
-    print(Y_train.shape)
-    model.fit(df_encoded.values, Y_train.values, epochs=40, batch_size=1000)
-    scores = model.evaluate(df_encoded.values, Y_train.values)
+    model.fit(df_encoded.values[:len(X_train)], Y_train.values, epochs=40, batch_size=1000)
+    scores = model.evaluate(df_encoded.values[:len(X_train)], Y_train.values)
     print("\nTraining Score: %.2f" % (scores[1]*100))
-    scores = model.evaluate(df_encoded_test.values, Y_test.values)
+    scores = model.evaluate(df_encoded.values[len(X_train):], Y_test.values)
     print("\nTesting Score: %.2f" % (scores[1]*100))
+
+    Y_pred = model.predict(df_encoded.values[len(X_train):])
+    print("The confusion matrix is : \n",confusion_matrix(Y_test.values.argmax(axis=1), Y_pred.argmax(axis=1)))
+    print("Mean Absolute error is :",mean_absolute_error(Y_test.values.argmax(axis=1), Y_pred.argmax(axis=1)))
+    print("Evaluation Metrics : \n",classification_report(Y_test.values.argmax(axis=1), Y_pred.argmax(axis=1)))
 
     
 ###########_____Driver Code______##############
@@ -367,7 +358,6 @@ original_data  = df.copy()
 original_data=encodeDate(original_data)   #convert date to the day of the week with Monday=0, Sunday=6
 original_data=weightedRandomImputation(original_data) # Missing Value Imputation
 
-
 df,df_test = train_test_split( df, test_size=0.3, stratify=df['country_destination'])
 
 df=encodeDate(df)   #convert date to the day of the week with Monday=0, Sunday=6
@@ -378,7 +368,7 @@ df_test = encodeDate(df_test)
 df_test = weightedRandomImputation(df_test)
 
 randomForestDecisionClassifier(df,df_test)
-xgboostClassifier(df,df_test)
 KNNClassifier(df,df_test)
 Naivebayes(df,df_test)
 ann(df,df_test)
+xgboostClassifier(df,df_test)
